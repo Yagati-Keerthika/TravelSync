@@ -30,8 +30,9 @@ public class AhoCorasick {
 
     private void buildTrie(Collection<String> patterns) {
         if (patterns == null) return;
+        Set<String> seen = new HashSet<>();
         for (String pattern : patterns) {
-            if (pattern == null || pattern.isEmpty()) continue;
+            if (pattern == null || pattern.isEmpty() || !seen.add(pattern)) continue;
             Node current = root;
             for (char ch : pattern.toCharArray()) {
                 current = current.children.computeIfAbsent(ch, c -> new Node());
@@ -63,8 +64,11 @@ public class AhoCorasick {
                 }
 
                 child.fail = (fallback != null) ? fallback.children.get(ch) : root;
-                // Merge dictionary output links
-                child.outputs.addAll(child.fail.outputs);
+                // Merge dictionary output links without duplicating pattern matches
+                Set<String> mergedOutputs = new LinkedHashSet<>(child.outputs);
+                mergedOutputs.addAll(child.fail.outputs);
+                child.outputs.clear();
+                child.outputs.addAll(mergedOutputs);
                 queue.add(child);
             }
         }

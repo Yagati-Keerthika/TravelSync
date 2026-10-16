@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Route, MapPin, Calendar, CheckCircle2, ArrowRight, Clock, Gauge, DollarSign, Layers } from 'lucide-react';
+import { Route, MapPin, Calendar, CheckCircle2, ArrowRight, Layers, Plus, Trash2 } from 'lucide-react';
 import TravelApi from '../services/api';
 
 export default function PlannerPage() {
@@ -22,14 +22,21 @@ export default function PlannerPage() {
     { id: 'ACT-5', name: 'Coastal Kayaking Adventure', startMinutes: 310, endMinutes: 420, value: 90, category: 'Adventure' },
     { id: 'ACT-6', name: 'Sunset Viewpoint Photography', startMinutes: 430, endMinutes: 520, value: 70, category: 'Scenery' },
   ];
-  const [activities, setActivities] = useState(defaultActivities);
+  const [activities, setActivities] = useState([]);
   const [scheduleResult, setScheduleResult] = useState(null);
   const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [activityDraft, setActivityDraft] = useState({
+    name: '', startTime: '08:00', endTime: '09:00', value: '50', category: 'Other',
+  });
+  const [activityError, setActivityError] = useState('');
 
-  // Tree DP Hierarchy state
-  const [budget, setBudget] = useState(250);
-  const [treeResult, setTreeResult] = useState(null);
-  const [treeLoading, setTreeLoading] = useState(false);
+  // Budget-based live nearby-place recommendations
+  const [budget, setBudget] = useState('100');
+  const [budgetCity, setBudgetCity] = useState('');
+  const [budgetPlaces, setBudgetPlaces] = useState([]);
+  const [budgetDestination, setBudgetDestination] = useState(null);
+  const [budgetLoading, setBudgetLoading] = useState(false);
+  const [budgetError, setBudgetError] = useState('');
 
   // Handlers for Bitmask DP Trip Planner
   const handleAddCity = () => {
@@ -64,72 +71,119 @@ export default function PlannerPage() {
 
   // Handler for Interval DP
   const handleOptimizeActivities = async () => {
+    setActivityError('');
+    if (activities.length === 0) {
+      setActivityError('Add at least one activity before planning your day.');
+      return;
+    }
     setScheduleLoading(true);
     try {
       const res = await TravelApi.optimizeActivities(activities);
       setScheduleResult(res.data);
     } catch (err) {
-      console.error(err);
+      setActivityError(err.message || 'Could not plan these activities. Please try again.');
     } finally {
       setScheduleLoading(false);
     }
   };
 
-  // Handler for Tree DP
-  const handleOptimizeTree = async () => {
-    setTreeLoading(true);
-
-    // Build hierarchical travel plan tree
-    const tripTree = {
-      id: 0,
-      name: 'South India Exploration',
-      type: 'TRIP',
-      cost: 60,
-      value: 40,
-      children: [
-        {
-          id: 1,
-          name: 'Day 1: Cultural City Tour',
-          type: 'DAY',
-          cost: 40,
-          value: 30,
-          children: [
-            { id: 2, name: 'Heritage Palace Visit', type: 'ACTIVITY', cost: 25, value: 35, children: [] },
-            { id: 3, name: 'Local Handicraft Bazaar', type: 'ACTIVITY', cost: 15, value: 20, children: [] },
-          ],
-        },
-        {
-          id: 4,
-          name: 'Day 2: Coastal & Water Sports',
-          type: 'DAY',
-          cost: 50,
-          value: 45,
-          children: [
-            { id: 5, name: 'Scuba Diving Session', type: 'ACTIVITY', cost: 45, value: 65, children: [] },
-            { id: 6, name: 'Sunset Dolphin Cruise', type: 'ACTIVITY', cost: 20, value: 30, children: [] },
-          ],
-        },
-        {
-          id: 7,
-          name: 'Day 3: Wildlife Sanctuary Safari',
-          type: 'DAY',
-          cost: 45,
-          value: 35,
-          children: [
-            { id: 8, name: 'Jeep Jungle Safari', type: 'ACTIVITY', cost: 35, value: 50, children: [] },
-          ],
-        },
-      ],
-    };
-
-    try {
-      const res = await TravelApi.optimizeTravelPlanHierarchy({ plan: tripTree, budget: Number(budget) });
-      setTreeResult(res.data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setTreeLoading(false);
+  const handleAddActivity = (event) => {
+    event.preventDefault();
+    const name = activityDraft.name.trim();
+    const [startHour, startMinute] = activityDraft.startTime.split(':').map(Number);
+    const [endHour, endMinute] = activityDraft.endTime.split(':').map(Number);
+    const startClockMinutes = startHour * 60 + startMinute;
+    const endClockMinutes = endHour * 60 + endMinute;
+    const value = Number(activityDraft.value);
+    if (!name || !Number.isFinite(startClockMinutes) || !Number.isFinite(endClockMinutes)
+      || endClockMinutes <= startClockMinutes
+      || !Number.isFinite(value) || value < 0) {
+      setActivityError('Enter an activity name, an end time later than the start time, and a non-negative priority.');
+      return;
     }
+    setActivities((current) => [...current, {
+      id: `ACT-${Date.now()}`,
+      name,
+      startMinutes: startClockMinutes - 8 * 60,
+      endMinutes: endClockMinutes - 8 * 60,
+      value,
+      category: activityDraft.category.trim() || 'Other',
+    }]);
+    setActivityDraft({ name: '', startTime: '08:00', endTime: '09:00', value: '50', category: 'Other' });
+    setActivityError('');
+    setScheduleResult(null);
+  };
+
+  const addSampleActivities = () => {
+    setActivities((current) => current.length ? current : defaultActivities);
+    setScheduleResult(null);
+    setActivityError('');
+  };
+
+  const estimateVisitCost = (place) => {
+    const category = `${place.category || ''} ${place.name || ''}`.toLowerCase();
+    if (/beach|park|viewpoint|temple|church|monument|shrine/.test(category)) return 0;
+    if (/museum|gallery|fort|palace/.test(category)) return 12;
+    if (/zoo|aquarium|theme park|water park/.test(category)) return 25;
+    return 8;
+  };
+
+  const handleBudgetSearch = async (event) => {
+    event.preventDefault();
+    const city = budgetCity.trim();
+    if (!city) {
+      setBudgetError('Enter a city to find nearby places that fit your budget.');
+      return;
+    }
+    setBudgetLoading(true);
+    setBudgetError('');
+    setBudgetPlaces([]);
+    setBudgetDestination(null);
+    try {
+      const search = await TravelApi.searchDestinations(city);
+      const destination = (search.data || [])[0];
+      if (!destination) {
+        setBudgetError(`No destination found for "${city}". Try another city name.`);
+        return;
+      }
+      setBudgetDestination(destination);
+      const response = await TravelApi.getDestinationPlaces(destination.latitude, destination.longitude);
+      const recommendations = (response.data || [])
+        .filter((place) => place.category !== 'Hotel')
+        .map((place) => ({ ...place, estimatedVisitCost: estimateVisitCost(place) }))
+        .sort((a, b) => a.estimatedVisitCost - b.estimatedVisitCost);
+      setBudgetPlaces(recommendations);
+      if (recommendations.length === 0) {
+        setBudgetError(`No nearby attractions were returned for ${destination.name}. Try another destination.`);
+      }
+    } catch (err) {
+      setBudgetError(err.message || 'Could not find nearby places. Please try again.');
+    } finally {
+      setBudgetLoading(false);
+    }
+  };
+
+  const budgetAmount = Number(budget) || 0;
+  const budgetPlan = [];
+  let remainingBudget = budgetAmount;
+  budgetPlaces.forEach((place) => {
+    if (place.estimatedVisitCost <= remainingBudget) {
+      budgetPlan.push(place);
+      remainingBudget -= place.estimatedVisitCost;
+    }
+  });
+  const budgetPlanNames = new Set(budgetPlan.map((place) => place.name));
+  const estimatedPlanSpend = budgetAmount - remainingBudget;
+  const scheduledActivityIds = new Set((scheduleResult?.selectedActivities || []).map((activity) => activity.id));
+  const skippedActivities = scheduleResult
+    ? activities.filter((activity) => !scheduledActivityIds.has(activity.id))
+    : [];
+
+  const formatActivityTime = (minutesAfterEight) => {
+    const minutesAfterMidnight = minutesAfterEight + 8 * 60;
+    const hours = Math.floor(minutesAfterMidnight / 60);
+    const minutes = minutesAfterMidnight % 60;
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
   };
 
   return (
@@ -180,7 +234,7 @@ export default function PlannerPage() {
             <div>
               <h2 style={{ fontSize: '1.25rem', fontWeight: 800 }}>Plan a route through your destinations</h2>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                Add your stops and choose whether distance or travel time matters most.
+                Add multiple city stops and choose whether distance or travel time matters most. This arranges the order of your cities; use “Plan your day” to schedule activities within one day.
               </p>
             </div>
           </div>
@@ -397,24 +451,56 @@ export default function PlannerPage() {
           </div>
 
           <p style={{ fontSize: '0.9rem', color: '#334155', marginBottom: '1.25rem' }}>
-            Choose experiences that fit together, with enough time to enjoy each stop.
+            Add your own places with clock start/end times, or load editable sample ideas. The planner uses weighted interval scheduling to choose the highest-priority set that does not overlap. Leave a gap between visits for travel time.
           </p>
+
+          <form onSubmit={handleAddActivity} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: '0.65rem', alignItems: 'end', marginBottom: '1rem' }}>
+            <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>
+              Activity name
+              <input value={activityDraft.name} onChange={(e) => setActivityDraft({ ...activityDraft, name: e.target.value })} placeholder="e.g. Visit a museum" style={{ display: 'block', width: '100%', padding: '0.55rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', marginTop: '0.25rem' }} />
+            </label>
+            <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>
+              Start time
+              <input type="time" value={activityDraft.startTime} onChange={(e) => setActivityDraft({ ...activityDraft, startTime: e.target.value })} required style={{ display: 'block', width: '100%', padding: '0.55rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', marginTop: '0.25rem' }} />
+            </label>
+            <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>
+              End time
+              <input type="time" value={activityDraft.endTime} onChange={(e) => setActivityDraft({ ...activityDraft, endTime: e.target.value })} required style={{ display: 'block', width: '100%', padding: '0.55rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', marginTop: '0.25rem' }} />
+            </label>
+            <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>
+              Priority
+              <input type="number" min="0" value={activityDraft.value} onChange={(e) => setActivityDraft({ ...activityDraft, value: e.target.value })} style={{ display: 'block', width: '100%', padding: '0.55rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', marginTop: '0.25rem' }} />
+            </label>
+            <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>
+              Category
+              <input value={activityDraft.category} onChange={(e) => setActivityDraft({ ...activityDraft, category: e.target.value })} style={{ display: 'block', width: '100%', padding: '0.55rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', marginTop: '0.25rem' }} />
+            </label>
+            <button className="btn-outline" type="submit"><Plus size={16} /> Add activity</button>
+          </form>
+          {activityError && <p role="alert" style={{ color: '#b42318', margin: '0.5rem 0' }}>{activityError}</p>}
+          <button className="btn-outline" type="button" onClick={addSampleActivities} style={{ marginBottom: '1rem' }}>
+            Add sample ideas (editable)
+          </button>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
             {activities.map((act) => (
               <div key={act.id} style={{ background: '#f8fafc', padding: '0.85rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.25rem' }}>
                   <strong style={{ fontSize: '0.92rem' }}>{act.name}</strong>
                   <span className="badge badge-gray">{act.category}</span>
                 </div>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  Suggested time: {act.formatTimeRange ? act.formatTimeRange() : `${act.startMinutes}-${act.endMinutes} mins`}
+                  {formatActivityTime(act.startMinutes)}–{formatActivityTime(act.endMinutes)} · priority {act.value}
                 </div>
+                <button type="button" onClick={() => { setActivities(activities.filter((item) => item.id !== act.id)); setScheduleResult(null); }} aria-label={`Remove ${act.name}`} style={{ color: '#9b2c2c', fontSize: '0.78rem', marginTop: '0.5rem' }}>
+                  <Trash2 size={13} /> Remove
+                </button>
               </div>
             ))}
           </div>
 
-          <button className="btn-primary" onClick={handleOptimizeActivities} disabled={scheduleLoading}>
+          {activities.length === 0 && <p style={{ color: 'var(--text-muted)', marginBottom: '1rem' }}>Add your own activities or choose sample ideas, then plan your day.</p>}
+          <button className="btn-primary" onClick={handleOptimizeActivities} disabled={scheduleLoading || activities.length === 0}>
             {scheduleLoading ? 'Putting your day together...' : 'Plan my day'}
           </button>
 
@@ -433,7 +519,7 @@ export default function PlannerPage() {
                   <div key={i} style={{ background: 'white', padding: '0.75rem 1rem', borderRadius: 'var(--radius-sm)', border: '1px solid #d1fae5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <CheckCircle2 size={16} color="#10b981" />
-                      <strong>{act.name}</strong>
+                      <strong>{formatActivityTime(act.startMinutes)}–{formatActivityTime(act.endMinutes)} · {act.name}</strong>
                     </div>
                     <span style={{ fontSize: '0.85rem', color: '#065f46', fontWeight: 600 }}>
                       {act.category}
@@ -441,6 +527,28 @@ export default function PlannerPage() {
                   </div>
                 ))}
               </div>
+              {skippedActivities.length > 0 && (
+                <div style={{ marginTop: '1rem', padding: '0.85rem 1rem', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 'var(--radius-sm)', color: '#7c2d12' }}>
+                  <strong>Not scheduled because of overlaps or lower combined priority:</strong>
+                  <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.2rem' }}>
+                    {skippedActivities.map((activity) => {
+                      const conflicts = scheduleResult.selectedActivities.filter(
+                        (selected) => activity.startMinutes < selected.endMinutes
+                          && selected.startMinutes < activity.endMinutes,
+                      );
+                      return (
+                        <li key={activity.id}>
+                          {activity.name}
+                          {conflicts.length > 0 && ` overlaps ${conflicts.map((conflict) => conflict.name).join(', ')}`}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  <p style={{ margin: '0.5rem 0 0', fontSize: '0.82rem' }}>
+                    If you want both activities, change their times so one ends before the next begins.
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -453,50 +561,49 @@ export default function PlannerPage() {
             <div>
               <h2 style={{ fontSize: '1.25rem', fontWeight: 800 }}>Plan a trip within your budget</h2>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                Set a budget and explore a sample trip plan with costs in mind.
+                Choose any destination to see real nearby attractions, ranked by illustrative per-person visit estimates.
               </p>
             </div>
           </div>
 
-          <div style={{ marginBottom: '1.5rem' }}>
-            <label style={{ fontSize: '0.88rem', fontWeight: 600, display: 'block', marginBottom: '0.4rem' }}>
-              Trip budget ($): <strong>${budget}</strong>
+          <form onSubmit={handleBudgetSearch} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'end', margin: '1.25rem 0' }}>
+            <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>
+              Destination
+              <input value={budgetCity} onChange={(e) => setBudgetCity(e.target.value)} placeholder="e.g. Goa, Manali, Paris" style={{ display: 'block', minWidth: '250px', padding: '0.65rem 0.8rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', marginTop: '0.3rem' }} />
             </label>
-            <input
-              type="range"
-              min="100"
-              max="350"
-              step="10"
-              value={budget}
-              onChange={(e) => setBudget(e.target.value)}
-              style={{ width: '100%', maxWidth: '400px' }}
-            />
-          </div>
-
-          <p style={{ margin: '0 0 1.5rem', color: 'var(--text-muted)', fontSize: '0.88rem', lineHeight: 1.65 }}>
-            Your sample plan includes a cultural city tour, coastal activities, and a wildlife visit. Adjust the budget to see what fits.
+            <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>
+              Activity budget (USD)
+              <input type="number" min="0" value={budget} onChange={(e) => setBudget(e.target.value)} style={{ display: 'block', width: '150px', padding: '0.65rem 0.8rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', marginTop: '0.3rem' }} />
+            </label>
+            <button className="btn-accent" type="submit" disabled={budgetLoading}>
+              {budgetLoading ? 'Finding nearby places…' : 'Find places for my budget'}
+            </button>
+          </form>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', lineHeight: 1.6 }}>
+            Places come from OpenStreetMap. Costs are rough per-person examples (free outdoor/heritage sites: $0; museums: $12; major attractions: $25; other places: $8), not live ticket prices. Stay and transport costs are not included.
           </p>
-
-          <button className="btn-accent" onClick={handleOptimizeTree} disabled={treeLoading}>
-            {treeLoading ? 'Finding a plan...' : `Build a plan for $${budget}`}
-          </button>
-
-          {treeResult && (
-            <div style={{ marginTop: '1.5rem', background: '#fffbeb', padding: '1.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid #fde68a' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                <strong style={{ color: '#92400e', fontSize: '1.1rem' }}>
-                  Suggested trip plan (enjoyment: {treeResult.maxValue})
-                </strong>
-                <span className="badge badge-orange">
-                  Cost Spent: ${treeResult.totalCostUsed} / ${budget}
-                </span>
-              </div>
-              <ul style={{ paddingLeft: '1.25rem', fontSize: '0.9rem', color: '#78350f' }}>
-                {treeResult.selectedItems.map((item, idx) => (
-                  <li key={idx} style={{ marginBottom: '0.35rem' }}>{item}</li>
+          {budgetError && <p role="alert" style={{ color: '#b42318' }}>{budgetError}</p>}
+          {budgetDestination && budgetPlaces.length > 0 && (
+            <section style={{ marginTop: '1.5rem' }}>
+              <h3><MapPin size={17} /> Nearby places in {budgetDestination.name} ({budgetPlaces.length})</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                Suggested budget-fit picks: {budgetPlan.length} places, about ${estimatedPlanSpend} total of your ${budgetAmount} budget. Estimates are illustrative; verify actual entry prices before travelling.
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '0.75rem' }}>
+                {budgetPlaces.map((place, index) => (
+                  <article key={`${place.name}-${place.latitude}-${index}`} style={{ padding: '0.9rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', background: place.estimatedVisitCost <= budgetAmount ? '#f0fdf4' : '#fff7ed' }}>
+                    <strong>{place.name}</strong>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '0.35rem' }}>
+                      {place.category || 'Local place'}{place.distanceKm > 0 ? ` · ${place.distanceKm.toFixed(1)} km away` : ''}
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', marginTop: '0.6rem', fontSize: '0.82rem' }}>
+                      <span>Est. visit: {place.estimatedVisitCost === 0 ? 'Free' : `$${place.estimatedVisitCost}`}</span>
+                      <strong>{budgetPlanNames.has(place.name) ? 'In budget-fit picks' : 'Other nearby option'}</strong>
+                    </div>
+                  </article>
                 ))}
-              </ul>
-            </div>
+              </div>
+            </section>
           )}
         </div>
       )}

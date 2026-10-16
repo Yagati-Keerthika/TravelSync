@@ -45,104 +45,121 @@ public class TreeDP {
             return new TreeOptimizationResult(0, 0, List.of(), "O(1)");
         }
 
-        // Collect all nodes to map them to 0..n-1
-        List<TreeNode> allNodes = new ArrayList<>();
-        flattenTree(root, allNodes);
-        int n = allNodes.size();
-
-        // dp[u][b] = max value from subtree u using budget b, assuming u is selected
-        int[][] dp = new int[n][budget + 1];
-        boolean[][][] choice = new boolean[n][budget + 1][];
-
-        // Bottom-up post-order traversal
-        dfs(root, budget, dp);
-
+        int[] rootDp = solveSubtree(root, budget);
         int bestVal = 0;
         int bestBudgetUsed = 0;
 
         for (int b = 0; b <= budget; b++) {
-            if (dp[root.id()][b] > bestVal) {
-                bestVal = dp[root.id()][b];
+            if (rootDp[b] > bestVal) {
+                bestVal = rootDp[b];
                 bestBudgetUsed = b;
             }
         }
 
-        // Traceback selected items
         List<String> selectedNames = new ArrayList<>();
         if (bestVal > 0) {
-            reconstruct(root, bestBudgetUsed, dp, selectedNames);
+            selectedNames.addAll(reconstructSelection(root, bestBudgetUsed));
         }
 
-        String complexity = String.format("O(N * B^2) = %d states * %d budget", n, budget);
+        String complexity = String.format("O(N * B^2) = %d states * %d budget", countNodes(root), budget);
         return new TreeOptimizationResult(bestVal, bestBudgetUsed, selectedNames, complexity);
     }
 
-    private static void flattenTree(TreeNode node, List<TreeNode> list) {
-        list.add(node);
-        for (TreeNode child : node.children()) {
-            flattenTree(child, list);
+    private static int countNodes(TreeNode node) {
+        if (node == null) {
+            return 0;
         }
+        int total = 1;
+        for (TreeNode child : node.children()) {
+            total += countNodes(child);
+        }
+        return total;
     }
 
-    private static void dfs(TreeNode node, int maxBudget, int[][] dp) {
-        int u = node.id();
-        int cost = node.cost();
-        int val = node.value();
+    private static int[] solveSubtree(TreeNode node, int budget) {
+        int[] childrenDp = new int[budget + 1];
+        Arrays.fill(childrenDp, 0);
 
-        // Initialize: if budget < cost, impossible (-1)
-        Arrays.fill(dp[u], -1);
-
-        if (cost <= maxBudget) {
-            dp[u][cost] = val;
-        }
-
-        // Process children
         for (TreeNode child : node.children()) {
-            dfs(child, maxBudget, dp);
-            int v = child.id();
-
-            int[] nextDp = Arrays.copyOf(dp[u], maxBudget + 1);
-
-            for (int b1 = cost; b1 <= maxBudget; b1++) {
-                if (dp[u][b1] < 0) continue;
-
-                for (int b2 = 0; b1 + b2 <= maxBudget; b2++) {
-                    if (dp[v][b2] < 0) continue;
-                    int candidate = dp[u][b1] + dp[v][b2];
-                    if (candidate > nextDp[b1 + b2]) {
-                        nextDp[b1 + b2] = candidate;
-                    }
-                }
-            }
-            System.arraycopy(nextDp, 0, dp[u], 0, maxBudget + 1);
+            int[] childDp = solveSubtree(child, budget);
+            childrenDp = mergeValues(childrenDp, childDp, budget);
         }
+
+        int[] dp = new int[budget + 1];
+        for (int used = 0; used <= budget; used++) {
+            if (node.cost() <= used) {
+                int remaining = used - node.cost();
+                dp[used] = Math.max(0, node.value() + childrenDp[remaining]);
+            } else {
+                dp[used] = 0;
+            }
+        }
+        return dp;
     }
 
-    private static void reconstruct(TreeNode node, int currentBudget, int[][] dp, List<String> result) {
-        result.add(String.format("%s (%s, cost: $%d, val: %d)", node.name(), node.type(), node.cost(), node.value()));
+    private static int[] mergeValues(int[] left, int[] right, int budget) {
+        int[] merged = new int[budget + 1];
+        for (int usedLeft = 0; usedLeft <= budget; usedLeft++) {
+            for (int usedRight = 0; usedLeft + usedRight <= budget; usedRight++) {
+                merged[usedLeft + usedRight] = Math.max(
+                        merged[usedLeft + usedRight],
+                        left[usedLeft] + right[usedRight]
+                );
+            }
+        }
+        return merged;
+    }
 
-        int remainingBudget = currentBudget - node.cost();
-        if (remainingBudget <= 0 || node.children().isEmpty()) {
-            return;
+    private static List<String> reconstructSelection(TreeNode node, int budget) {
+        List<String> selected = new ArrayList<>();
+        if (node == null || budget < 0) {
+            return selected;
         }
 
-        // Allocate budget across children greedily/matching DP sub-results
+        int[] subtree = solveSubtree(node, budget);
+        int maxWithNode = node.cost() <= budget ? node.value() + bestChildrenValue(node.children(), budget - node.cost()) : 0;
+        if (maxWithNode <= 0 || subtree[budget] <= 0 || maxWithNode != subtree[budget]) {
+            return selected;
+        }
+
+        selected.add(String.format("%s (%s, cost: $%d, val: %d)", node.name(), node.type(), node.cost(), node.value()));
+        int remaining = budget - node.cost();
         for (TreeNode child : node.children()) {
-            int v = child.id();
-            int bestAlloc = -1;
-            int bestVal = -1;
-
-            for (int b = 0; b <= remainingBudget; b++) {
-                if (dp[v][b] > bestVal) {
-                    bestVal = dp[v][b];
-                    bestAlloc = b;
-                }
+            if (remaining <= 0) {
+                break;
             }
-
-            if (bestVal > 0 && bestAlloc > 0) {
-                reconstruct(child, bestAlloc, dp, result);
-                remainingBudget -= bestAlloc;
+            int[] childDp = solveSubtree(child, remaining);
+            int chosenBudget = chooseBestBudget(childDp, remaining);
+            if (chosenBudget > 0) {
+                selected.addAll(reconstructSelection(child, chosenBudget));
+                remaining -= chosenBudget;
             }
         }
+        return selected;
+    }
+
+    private static int bestChildrenValue(List<TreeNode> children, int budget) {
+        if (children == null || children.isEmpty()) {
+            return 0;
+        }
+
+        int[] combined = new int[budget + 1];
+        Arrays.fill(combined, 0);
+        for (TreeNode child : children) {
+            combined = mergeValues(combined, solveSubtree(child, budget), budget);
+        }
+        return combined[budget];
+    }
+
+    private static int chooseBestBudget(int[] dp, int budget) {
+        int bestBudget = 0;
+        int bestValue = -1;
+        for (int b = 0; b <= budget; b++) {
+            if (dp[b] > bestValue) {
+                bestValue = dp[b];
+                bestBudget = b;
+            }
+        }
+        return bestValue > 0 ? bestBudget : 0;
     }
 }

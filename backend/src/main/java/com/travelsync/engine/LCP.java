@@ -74,9 +74,11 @@ public class LCP {
         }
 
         int len1 = s1.length();
-        // Concatenate using sentinel delimiters distinct from input
-        String combined = s1 + "#" + s2 + "$";
+        String firstDelimiter = findSafeDelimiter(s1, s2);
+        String secondDelimiter = findSafeDelimiter(s1 + firstDelimiter, s2);
+        String combined = s1 + firstDelimiter + s2 + secondDelimiter;
         int totalLen = combined.length();
+        int secondStringStart = len1 + firstDelimiter.length();
 
         SuffixArray sa = new SuffixArray(combined);
         int[] saArr = sa.getArray();
@@ -89,8 +91,9 @@ public class LCP {
             int p1 = saArr[i];
             int p2 = saArr[i - 1];
 
-            // Verify the two suffixes come from different original strings
-            boolean fromDifferent = (p1 < len1 && p2 > len1) || (p1 > len1 && p2 < len1);
+            boolean fromDifferent =
+                    (p1 < len1 && p2 >= secondStringStart) ||
+                    (p2 < len1 && p1 >= secondStringStart);
             if (fromDifferent && lcp[i] > maxLen) {
                 maxLen = lcp[i];
                 bestSaIdx = i;
@@ -108,5 +111,15 @@ public class LCP {
         }
 
         return new CommonSubstringResult("", 0, -1, -1);
+    }
+
+    private static String findSafeDelimiter(String left, String right) {
+        for (int codePoint = 1; codePoint < 128; codePoint++) {
+            char candidate = (char) codePoint;
+            if (left.indexOf(candidate) < 0 && right.indexOf(candidate) < 0) {
+                return String.valueOf(candidate);
+            }
+        }
+        return "\u0001";
     }
 }

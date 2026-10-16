@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ArrowRight, Compass, ExternalLink, Hotel, MapPin, Navigation, Route, Search, Thermometer, Wind } from 'lucide-react';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import TravelApi from '../services/api';
 
 const popularSearches = ['Manali', 'Goa', 'Tokyo', 'Paris', 'Bengaluru'];
@@ -24,6 +26,36 @@ export default function SearchPage({ initialQuery = '' }) {
   const [suggestionsError, setSuggestionsError] = useState('');
   const [placesError, setPlacesError] = useState('');
   const [directionsError, setDirectionsError] = useState('');
+  const [routeMapElement, setRouteMapElement] = useState(null);
+
+  useEffect(() => {
+    if (!routeMapElement || !directions || !routeOrigin || !selectedDestination) return undefined;
+
+    const map = L.map(routeMapElement, { scrollWheelZoom: false });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors',
+    }).addTo(map);
+
+    const routePoints = (directions.routeCoordinates || [])
+      .map(([longitude, latitude]) => [latitude, longitude]);
+    const originPoint = [routeOrigin.latitude, routeOrigin.longitude];
+    const destinationPoint = [selectedDestination.latitude, selectedDestination.longitude];
+    const points = routePoints.length > 1 ? routePoints : [originPoint, destinationPoint];
+    L.polyline(points, { color: '#1683d8', weight: 6, opacity: 0.9 }).addTo(map);
+
+    const marker = (label, color) => L.divIcon({
+      className: 'route-map-marker',
+      html: `<span style="background:${color}">${label}</span>`,
+      iconSize: [30, 30],
+      iconAnchor: [15, 15],
+    });
+    L.marker(originPoint, { icon: marker('A', '#276749') }).addTo(map).bindPopup(routeOrigin.name);
+    L.marker(destinationPoint, { icon: marker('B', '#c05621') }).addTo(map).bindPopup(selectedDestination.name);
+    map.fitBounds(L.latLngBounds([originPoint, destinationPoint, ...points]).pad(0.14));
+
+    return () => map.remove();
+  }, [routeMapElement, directions, routeOrigin, selectedDestination]);
 
   const searchDestinations = async (value) => {
     const destinationQuery = value.trim();
@@ -166,8 +198,8 @@ export default function SearchPage({ initialQuery = '' }) {
   };
 
   return (
-    <div className="destination-search-page">
-      <section className="destination-search-header">
+    <div className={`destination-search-page ${selectedDestination ? 'destination-detail-page' : ''}`}>
+      {!selectedDestination && <section className="destination-search-header">
         <div className="destination-search-heading">
           <span className="section-eyebrow"><Compass size={15} /> TRAVELSYNC DESTINATIONS</span>
           <h1>Where would you like to go?</h1>
@@ -206,11 +238,11 @@ export default function SearchPage({ initialQuery = '' }) {
             ))}
           </div>
         )}
-      </section>
+      </section>}
 
-      {error && <div className="destination-search-alert" role="alert">{error}</div>}
+      {!selectedDestination && error && <div className="destination-search-alert" role="alert">{error}</div>}
 
-      {searchedFor && !error && (
+      {!selectedDestination && searchedFor && !error && (
         <section className="destination-results">
           <div className="destination-results-heading">
             <div>
@@ -306,6 +338,9 @@ export default function SearchPage({ initialQuery = '' }) {
 
       {selectedDestination && (
         <section className="destination-detail-panel" aria-live="polite">
+          <button className="destination-back-button" type="button" onClick={() => setSelectedDestination(null)}>
+            <ArrowRight size={16} style={{ transform: 'rotate(180deg)' }} /> Back to search results
+          </button>
           <div className="destination-detail-cover">
             <img src={selectedDestination.imageUrl || fallbackImage} alt="" />
             <div className="destination-detail-cover-shade" />
@@ -318,7 +353,7 @@ export default function SearchPage({ initialQuery = '' }) {
             <div className="destination-detail-main">
               <span className="section-eyebrow">A LITTLE ABOUT THIS PLACE</span>
               <p>
-                {selectedDestination.extract || selectedDestination.description || `Explore ${selectedDestination.name}, discover nearby places, and start putting together a trip that suits you.`}
+                {selectedDestination.extract || selectedDestination.description || `${selectedDestination.name} is a destination in ${selectedDestination.region ? `${selectedDestination.region}, ` : ''}${selectedDestination.country}. Explore nearby landmarks and plan a visit around your interests.`}
               </p>
               {selectedDestination.weather && (
                 <div className="destination-detail-weather">
@@ -382,6 +417,12 @@ export default function SearchPage({ initialQuery = '' }) {
                         ))}
                       </ol>
                     )}
+                    <div
+                      ref={setRouteMapElement}
+                      className="route-map"
+                      role="img"
+                      aria-label={`Driving route map from ${routeOrigin.name} to ${selectedDestination.name}`}
+                    />
                     <a
                       className="route-map-link"
                       href={`https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${encodeURIComponent(`${routeOrigin.latitude},${routeOrigin.longitude};${selectedDestination.latitude},${selectedDestination.longitude}`)}`}

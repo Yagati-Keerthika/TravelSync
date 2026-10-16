@@ -24,7 +24,8 @@ public interface RoutingApiClient {
             double durationSeconds,
             String formattedDistance,
             String formattedDuration,
-            List<RouteStep> steps
+            List<RouteStep> steps,
+            List<List<Double>> routeCoordinates
     ) {}
 
     record RouteStep(String instruction, String roadName, double distanceMeters, double durationSeconds) {}

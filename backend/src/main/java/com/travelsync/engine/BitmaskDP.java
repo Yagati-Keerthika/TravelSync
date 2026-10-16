@@ -30,9 +30,23 @@ public class BitmaskDP {
      * @return TourResult with minimum cost and permutation of visited cities
      */
     public static TourResult solveOptimalTour(double[][] costMatrix, int startIndex) {
+        if (costMatrix == null || costMatrix.length == 0) {
+            return new TourResult(0.0, List.of(), "O(1)");
+        }
+
         int n = costMatrix.length;
         if (n <= 1) {
             return new TourResult(0.0, n == 1 ? List.of(0) : List.of(), "O(1)");
+        }
+
+        for (double[] row : costMatrix) {
+            if (row == null || row.length != n) {
+                return new TourResult(0.0, List.of(), "O(1)");
+            }
+        }
+
+        if (startIndex < 0 || startIndex >= n) {
+            return new TourResult(0.0, List.of(), "O(1)");
         }
 
         int totalMasks = 1 << n;

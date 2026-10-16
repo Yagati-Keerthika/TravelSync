@@ -1421,6 +1421,21 @@ input, select, textarea {
   box-shadow: 0 6px 24px rgba(35, 54, 40, 0.06);
 }
 
+.destination-detail-page {
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.destination-back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 1rem 1.25rem;
+  color: #386b55;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
 .destination-detail-cover {
   position: relative;
   height: 280px;
@@ -1661,6 +1676,35 @@ input, select, textarea {
   margin-top: 0.8rem;
   padding-top: 0.75rem;
   border-top: 1px solid #e7e9e4;
+}
+
+.route-map {
+  width: 100%;
+  height: 320px;
+  margin: 0.85rem 0;
+  overflow: hidden;
+  border: 1px solid #dce4dc;
+  border-radius: 9px;
+  background: #eaf0e8;
+  z-index: 0;
+}
+
+.route-map-marker {
+  border: 0;
+  background: transparent;
+}
+
+.route-map-marker span {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 5px #0005;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 800;
 }
 
 .route-result-summary {

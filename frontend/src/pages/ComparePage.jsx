@@ -39,7 +39,7 @@ export default function ComparePage() {
           <span>Choose two places</span>
         </h2>
         <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
-          Explore key details and nearby highlights for both destinations.
+          Compare each place’s overview, travel styles and distance. The shared phrase is a text match from the descriptions, not a judgement that the places are alike.
         </p>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
@@ -99,7 +99,7 @@ export default function ComparePage() {
             <div style={{ marginBottom: '1.25rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
                 <Sparkles size={16} color="var(--accent)" />
-                <strong style={{ fontSize: '1.05rem' }}>What these places have in common</strong>
+                <strong style={{ fontSize: '1.05rem' }}>Longest shared phrase in their descriptions</strong>
               </div>
               {comparison.longestCommonSubstring.length > 0 ? (
                 <div>
@@ -107,11 +107,11 @@ export default function ComparePage() {
                     "{comparison.longestCommonSubstring.longestCommonSubstring}"
                   </div>
                   <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    Shared phrase length: <strong>{comparison.longestCommonSubstring.length} characters</strong>
+                    Found with suffix-array + LCP text matching: <strong>{comparison.longestCommonSubstring.length} characters</strong>
                   </div>
                 </div>
               ) : (
-                <div style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>No significant common substring between extracts.</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>No shared description phrase was found. Compare the travel styles and distance below instead.</div>
               )}
             </div>
 

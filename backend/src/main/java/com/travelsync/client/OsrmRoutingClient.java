@@ -89,7 +89,7 @@ public class OsrmRoutingClient implements RoutingApiClient {
     ) {
         String coordinates = String.format(Locale.US, "%.5f,%.5f;%.5f,%.5f",
                 originLongitude, originLatitude, destinationLongitude, destinationLatitude);
-        String url = String.format("%s/%s?overview=false&steps=true", routeUrl, coordinates);
+        String url = String.format("%s/%s?overview=full&geometries=geojson&steps=true", routeUrl, coordinates);
 
         try {
             String response = restTemplate.getForObject(url, String.class);
@@ -122,10 +122,20 @@ public class OsrmRoutingClient implements RoutingApiClient {
 
             double distanceMeters = route.path("distance").asDouble();
             double durationSeconds = route.path("duration").asDouble();
+            List<List<Double>> routeCoordinates = new java.util.ArrayList<>();
+            JsonNode coordinatesNode = route.path("geometry").path("coordinates");
+            if (coordinatesNode.isArray()) {
+                for (JsonNode coordinate : coordinatesNode) {
+                    if (coordinate.size() >= 2) {
+                        routeCoordinates.add(List.of(coordinate.get(0).asDouble(), coordinate.get(1).asDouble()));
+                    }
+                }
+            }
             log.info("Fetched driving directions from OSRM ({} meters, {} steps)",
                     distanceMeters, steps.size());
             return new DrivingDirections(distanceMeters, durationSeconds,
-                    formatDistance(distanceMeters), formatDuration(durationSeconds), List.copyOf(steps));
+                    formatDistance(distanceMeters), formatDuration(durationSeconds), List.copyOf(steps),
+                    List.copyOf(routeCoordinates));
         } catch (ExternalApiException ex) {
             throw ex;
         } catch (Exception ex) {

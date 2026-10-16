@@ -64,6 +64,12 @@ public class WikipediaTravelInfoClient implements TravelInfoApiClient {
                     imageUrl = root.path("thumbnail").path("source").asText();
                 }
 
+                boolean disambiguation = root.path("type").asText("").equalsIgnoreCase("disambiguation")
+                        || extract.toLowerCase(java.util.Locale.ROOT).contains("may refer to:");
+                if (disambiguation) {
+                    extract = "";
+                    description = "";
+                }
                 destination.setExtract(extract);
                 destination.setDescription(!description.isBlank() ? description : extract);
                 if (imageUrl != null) {
@@ -75,11 +81,18 @@ public class WikipediaTravelInfoClient implements TravelInfoApiClient {
             }
         } catch (Exception ex) {
             log.warn("Wikipedia summary lookup for '{}' was not found or timed out: {}", destination.getName(), ex.getMessage());
-            // Fallback description from destination metadata
-            if (destination.getDescription() == null || destination.getDescription().isBlank()) {
-                destination.setDescription(String.format("%s is a destination in %s, located at coordinates (%.4f, %.4f).",
-                        destination.getName(), destination.getCountry(), destination.getLatitude(), destination.getLongitude()));
-            }
+        }
+
+        if (destination.getDescription() == null || destination.getDescription().isBlank()) {
+            String profile = fallbackProfile(destination.getName());
+            String location = destination.getRegion() == null || destination.getRegion().isBlank()
+                    ? destination.getCountry() : destination.getRegion() + ", " + destination.getCountry();
+            destination.setDescription(profile.isBlank()
+                    ? String.format("%s is a city in %s. Explore its nearby landmarks, local places and route options using TravelSync.",
+                    destination.getName(), location)
+                    : profile);
+            destination.setExtract(destination.getDescription());
+            inferCategories(destination, destination.getDescription());
         }
 
         // Fallback placeholder image if none returned from API
@@ -112,5 +125,21 @@ public class WikipediaTravelInfoClient implements TravelInfoApiClient {
 
     private String getDefaultImageForDestination(String name) {
         return "https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&w=1200&q=80";
+    }
+
+    private String fallbackProfile(String name) {
+        return switch (name.toLowerCase(java.util.Locale.ROOT)) {
+            case "manali" -> "Manali is a Himalayan resort town in Himachal Pradesh, known for mountain scenery, the Beas River, trekking and winter sports. It is a popular base for exploring the Kullu Valley.";
+            case "goa" -> "Goa is a coastal state in western India known for Arabian Sea beaches, Portuguese-influenced heritage, seafood, markets and a lively nightlife.";
+            case "shimla" -> "Shimla is a hill city in Himachal Pradesh, known for its mountain views, colonial-era architecture, The Ridge and nearby Himalayan trails.";
+            case "jaipur" -> "Jaipur, Rajasthan's capital, is known for its historic forts and palaces, pink-hued old city, craft markets and regional cuisine.";
+            case "mumbai" -> "Mumbai is a coastal metropolis in Maharashtra known for its seafront, historic architecture, performing arts, markets and diverse food.";
+            case "bengaluru", "bangalore" -> "Bengaluru is Karnataka's capital, known for its gardens, technology district, cafés, museums and lively food scene.";
+            case "tokyo" -> "Tokyo is Japan's capital, combining historic temples and gardens with modern neighborhoods, museums, shopping and distinctive food.";
+            case "paris" -> "Paris is France's capital, known for its museums, historic architecture, gardens, cafés and landmarks along the Seine.";
+            case "kyoto" -> "Kyoto is known for its historic temples, traditional gardens, shrines and preserved neighborhoods in central Japan.";
+            case "rome" -> "Rome is Italy's capital, known for ancient ruins, historic churches, art, piazzas and celebrated local cuisine.";
+            default -> "";
+        };
     }
 }

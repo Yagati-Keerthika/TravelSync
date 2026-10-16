@@ -39,8 +39,10 @@ public class ComparisonService {
         Destination d1 = destinationService.getDestinationByName(name1);
         Destination d2 = destinationService.getDestinationByName(name2);
 
-        String desc1 = d1.getExtract() != null ? d1.getExtract() : d1.getDescription();
-        String desc2 = d2.getExtract() != null ? d2.getExtract() : d2.getDescription();
+        String desc1 = d1.getExtract() == null || d1.getExtract().isBlank()
+                ? d1.getDescription() : d1.getExtract();
+        String desc2 = d2.getExtract() == null || d2.getExtract().isBlank()
+                ? d2.getDescription() : d2.getExtract();
 
         // 1. Suffix Array + Kasai's LCP for Longest Common Substring
         LCP.CommonSubstringResult lcs = LCP.findLongestCommonSubstring(desc1, desc2);
