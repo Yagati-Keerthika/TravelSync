@@ -10,6 +10,7 @@ TravelSync is a web-based travel planning and information platform that combines
 - Search travel text and booking codes, including typo suggestions and multiple-keyword search.
 - Optimize multi-destination trip order using road-distance or travel-duration data.
 - Create optimized activity schedules and hierarchical travel plans.
+- Allocate travelers to compatible activities under seat-capacity limits using Edmonds–Karp maximum flow.
 - Get destination recommendations based on travel preferences.
 - Explore the algorithms and concepts behind the application in the Insights section.
 
@@ -59,6 +60,8 @@ Run the backend tests from the `backend` directory:
 mvn test
 ```
 
+The suite currently contains 23 passing tests, including Edmonds–Karp engine tests, activity-allocation service tests, and an API endpoint test.
+
 ## Algorithms
 
 The backend implements the following algorithms:
@@ -66,8 +69,23 @@ The backend implements the following algorithms:
 - **String search:** Naive Search, Knuth–Morris–Pratt (KMP), Z-Function, Rabin–Karp, and Aho–Corasick
 - **Text comparison:** Edit Distance, Suffix Array, Longest Common Prefix (LCP), Needleman–Wunsch, and Smith–Waterman
 - **Dynamic programming:** Bitmask DP, Interval DP, Tree DP, and Sum Over Subsets (SOS) DP
+- **Network flow:** Edmonds–Karp maximum flow for capacity-constrained traveler-to-activity allocation
 
-These algorithms support features such as text search, booking-code lookup, typo suggestions, description comparison, itinerary ordering, activity scheduling, hierarchical plan optimization, and preference-based recommendations.
+These algorithms support features such as text search, booking-code lookup, typo suggestions, description comparison, itinerary ordering, activity scheduling, capacity-constrained activity allocation, hierarchical plan optimization, and preference-based recommendations.
+
+## Network Flow: activity allocation
+
+The Trip Planner includes a capacity-aware activity allocator implemented with the Edmonds–Karp maximum-flow algorithm. A traveler is assigned to at most one activity, only when at least one of the traveler’s interest tags matches an activity category. Each activity also has a seat capacity. The solver maximizes the number of travelers assigned while respecting both compatibility and capacity.
+
+The service constructs a directed flow network:
+
+1. The source connects to each traveler with capacity `1`.
+2. A traveler connects to each compatible activity with capacity `1`.
+3. Each activity connects to the sink with capacity equal to its available seats.
+
+Edmonds–Karp repeatedly uses breadth-first search to find an augmenting path in the residual graph. Reverse residual edges allow previous allocations to be changed when that enables a larger overall assignment. The response reports the maximum flow, the traveler-to-activity assignments, travelers who could not be assigned, and basic graph/algorithm statistics. The algorithm runs in `O(V · E²)` time, where `V` is the number of graph vertices and `E` is the number of edges.
+
+Open **Trip Planner → Activity allocation** to try the editable sample or enter your own travelers, interests, activities, categories, and capacities. The API is `POST /api/activities/allocate`; it accepts `travelers` (`id`, `name`, `interests`) and `activities` (`id`, `name`, `categories`, `capacity`). The endpoint accepts up to 100 travelers and 100 activities per request.
 
 ## Data and integrations
 

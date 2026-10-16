@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Route, MapPin, Calendar, CheckCircle2, ArrowRight, Layers, Plus, Trash2 } from 'lucide-react';
+import { Route, MapPin, Calendar, CheckCircle2, ArrowRight, GitBranch, Layers, Plus, Trash2 } from 'lucide-react';
 import TravelApi from '../services/api';
+import ActivityAllocationPage from './ActivityAllocationPage';
 
 export default function PlannerPage() {
   const [plannerTab, setPlannerTab] = useState('itinerary');
@@ -190,7 +191,7 @@ export default function PlannerPage() {
     <div className="planner-page">
       <div style={{ marginBottom: '2rem' }}>
         <h1 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '0.4rem' }}>
-          Intelligent Trip Planner &amp; Dynamic Programming
+          Intelligent Trip Planner &amp; Optimization
         </h1>
         <p style={{ color: 'var(--text-muted)' }}>
           Organize your destinations, make time for the experiences you want, and keep your plans within budget.
@@ -224,6 +225,15 @@ export default function PlannerPage() {
         >
           <Layers size={16} color="var(--primary)" />
           <span>Trip budget</span>
+        </button>
+
+        <button
+          className={`btn-outline ${plannerTab === 'allocation' ? 'active' : ''}`}
+          style={{ borderColor: plannerTab === 'allocation' ? 'var(--primary)' : 'var(--border)', background: plannerTab === 'allocation' ? 'var(--primary-light)' : 'white' }}
+          onClick={() => setPlannerTab('allocation')}
+        >
+          <GitBranch size={16} color="var(--primary)" />
+          <span>Activity allocation</span>
         </button>
       </div>
 
@@ -607,6 +617,8 @@ export default function PlannerPage() {
           )}
         </div>
       )}
+
+      {plannerTab === 'allocation' && <ActivityAllocationPage />}
     </div>
   );
 }

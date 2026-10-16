@@ -68,6 +68,10 @@ export const TravelApi = {
     method: 'POST',
     body: JSON.stringify({ activities, maxSlots }),
   }),
+  allocateActivities: (travelers, activities) => request('/api/activities/allocate', {
+    method: 'POST',
+    body: JSON.stringify({ travelers, activities }),
+  }),
   optimizeTravelPlanHierarchy: (plan) => request('/api/travel-plan/optimize', {
     method: 'POST',
     body: JSON.stringify(plan),

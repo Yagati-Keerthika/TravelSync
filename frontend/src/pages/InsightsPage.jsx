@@ -35,16 +35,15 @@ const engineGroups = [
   {
     title: 'Network flow',
     icon: Workflow,
-    summary: 'Model capacities, assignments, and constrained choices as flow through a network.',
+    summary: 'TravelSync applies maximum flow to allocate travelers to suitable activities without exceeding capacity.',
     items: [
-      'Maximum flow: source, sink, capacity, conservation, and integral-capacity flows.',
-      'Ford–Fulkerson augmenting paths in the residual graph and correctness via max-flow min-cut.',
-      'Edmonds–Karp: BFS augmenting paths in O(VE²).',
-      'Dinic’s algorithm: blocking flows on level graphs in O(V²E).',
-      'Minimum cut as the dual of maximum flow; partitioning via flow.',
-      'Bipartite matching, König’s theorem, perfect matching, and assignment problems.',
-      'Minimum-cost maximum flow: successive shortest paths, cycle cancelling, and cost-aware assignment.',
-      'Practical reductions: image segmentation, project selection, and deadline scheduling.',
+      'Implemented: Edmonds–Karp finds augmenting paths with breadth-first search in the residual graph.',
+      'Network model: source → traveler (capacity 1) → eligible activity (capacity 1) → sink (activity seat capacity).',
+      'Reverse residual edges allow the algorithm to revise earlier assignments instead of relying on a greedy choice.',
+      'The maximum flow is the maximum number of travelers that can be assigned; unassigned travelers are reported.',
+      'Time complexity: O(VE²), where V is the number of vertices and E is the number of flow edges.',
+      'The max-flow min-cut theorem explains why a completed maximum assignment cannot be increased.',
+      'Dinic, minimum-cost flow, and broader assignment problems are possible extensions, not current implementations.',
     ],
   },
   {
@@ -110,7 +109,7 @@ export default function InsightsPage() {
         ))}
       </div>
       <p className="insights-note">
-        Some of these topics are implemented in TravelSync’s current travel tools; others are included here as study concepts and possible future applications.
+        The Edmonds–Karp activity allocator is implemented in the Trip Planner. Other topics in this guide are included as study concepts or possible future applications.
       </p>
     </div>
   );
