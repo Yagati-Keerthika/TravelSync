@@ -90,4 +90,4 @@ docs/       Project presentation and supporting documentation
 
 ## Project presentation
 
-The DSA Review-1 presentation is available at [docs/TravelSync_DSA_Review1.pptx](./docs/TravelSync_DSA_Review1.pptx).
+The DSA Review-1 presentation is available as a [PowerPoint file](./docs/TravelSync_DSA_Review1.pptx) and a [PDF for browser viewing](./docs/TravelSync_DSA_Review1.pdf).
